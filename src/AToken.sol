@@ -11,7 +11,7 @@ contract AToken is ERC20 {
     mapping(address => bool) private _added;
     mapping(address => bool) private _state;
 
-    address public _original;
+    address private _original;
 
     constructor(string memory name, string memory symbol, address original_) ERC20(name, symbol) {
         owner = msg.sender;

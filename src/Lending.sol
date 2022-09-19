@@ -39,7 +39,7 @@ contract Lending {
         deptTokens[usdc] = address(newUsdcDebtToken);
     }
 
-    function setOracle(address addr) {
+    function setOracle(address addr) public {
         require(msg.sender == owner);
         oracle = addr;
     }
@@ -67,7 +67,7 @@ contract Lending {
         token.burn(msg.sender, amount);
         address original = token.original();
         if (original == address(0))
-            msg.sender.transfer(amount);
+            payable(msg.sender).transfer(amount);
         else
             IERC20(original).transfer(msg.sender, amount);
     }
@@ -90,14 +90,14 @@ contract Lending {
     // tokenAddress => 갚고자 하는 Dept 토큰
     function repay(address tokenAddress, uint256 amount) external lock {
         DebtToken token = DebtToken(tokenAddress);
-        IERC20 origial = IERC20(token.origial());
+        IERC20 original = IERC20(token.original());
 
         require(original.balanceOf(msg.sender) >= amount, "Lending: Over than your balances");
 
         uint interest = token.getLastInterest(msg.sender);
         uint fee = (interest > amount) ? amount : interest;
 
-        AToken(tokens[origial]).updateInterest(fee);
+        AToken(tokens[address(original)]).updateInterest(fee);
         token.burn(msg.sender, amount);
     }
 

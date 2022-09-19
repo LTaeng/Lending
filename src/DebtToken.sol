@@ -9,9 +9,16 @@ contract DebtToken is ERC20 {
     address private owner;
     mapping(address => uint256) internal _timestamps;
     mapping(address => uint256) internal _receivedInterest;
+    
+    address private _original;
 
-    constructor() ERC20("Debt Token", "LDT") {
+    constructor(string memory name, string memory symbol, address original_) ERC20(name, symbol) {
         owner = msg.sender;
+        _original = original_;
+    }
+
+    function original() public view returns (address) {
+        return _original;
     }
 
     function balanceOf(address account) public view virtual override returns(uint256) {
@@ -32,6 +39,7 @@ contract DebtToken is ERC20 {
             interest += interest / 1000;
         interest -= accountBalance;
     }
+
 
     modifier onlyOwner() {
         require(msg.sender == owner);
