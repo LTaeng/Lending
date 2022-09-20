@@ -10,7 +10,8 @@ contract AToken is ERC20 {
     address[] private _userList;
     mapping(address => bool) private _added;
     mapping(address => bool) private _state;
-    mapping(address => bool) private liquidated;
+    mapping(address => bool) private _liquidate;
+    mapping(address => bool) private _guarantee;
 
     address private _original;
 
@@ -56,11 +57,19 @@ contract AToken is ERC20 {
     }
 
     function setLiquidate(address account, bool state) public onlyOwner {
-        liquidated[account] = state;
+        _liquidate[account] = state;
     }
 
     function liquidate(address account) public view returns (bool) {
-        return liquidated[account];
+        return _liquidate[account];
+    }
+
+    function setGuarantee(address account, bool state) public onlyOwner {
+        _guarantee[account] = state;
+    }
+
+    function guarantee(address account) public view returns (bool) {
+        return _guarantee[account];
     }
 
 }

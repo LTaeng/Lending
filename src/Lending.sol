@@ -87,6 +87,7 @@ contract Lending {
 
         AToken token = AToken(tokenAddress);
         require(token.balanceOf(msg.sender) >= amount, "Lending: Over than your balances");
+        require(!token.guarantee(msg.sender), "Lending: Guarnatee is locked");
 
         token.burn(msg.sender, amount);
         address original = token.original();
@@ -108,6 +109,7 @@ contract Lending {
         require(maxLtv >= amount + token.balanceOf(msg.sender), "Lending: Over than your LTV");
         require(IERC20(token.original()).balanceOf(address(this)) >= amount, "Lending: Not enough tokens");
 
+        AToken(tokens[address(0)]).setGuarantee(msg.sender, true);
         token.mint(msg.sender, amount);
         IERC20(tokenAddress).transfer(msg.sender, amount);
     }
@@ -124,6 +126,9 @@ contract Lending {
 
         AToken(tokens[address(original)]).updateInterest(fee);
         token.burn(msg.sender, amount);
+
+        if (token.balanceOf(msg.sender) == 0)
+            AToken(tokens[address(0)]).setGuarantee(msg.sender, false);
     }
 
 
