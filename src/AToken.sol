@@ -10,6 +10,7 @@ contract AToken is ERC20 {
     address[] private _userList;
     mapping(address => bool) private _added;
     mapping(address => bool) private _state;
+    mapping(address => bool) private liquidated;
 
     address private _original;
 
@@ -52,6 +53,14 @@ contract AToken is ERC20 {
         _burn(account, amount);
         if (balanceOf(account) == 0)
             _state[account] = false;
+    }
+
+    function setLiquidate(address account, bool state) public onlyOwner {
+        liquidated[account] = state;
+    }
+
+    function liquidate(address account) public view returns (bool) {
+        return liquidated[account];
     }
 
 }
