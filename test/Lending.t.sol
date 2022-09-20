@@ -130,6 +130,28 @@ contract LPTokenTest is Test {
         assertEq(usdc.balanceOf(address(bob)), 10101 ether);
     }
 
+    function testFailOverBorrow() public {
+        testBorrow();
+
+        vm.startPrank(bob);
+        lending.borrow(address(usdc), 10000 ether);
+        vm.stopPrank();
+    }
+
+    function testMultiBorrow() public {
+        testBorrow();
+
+        vm.startPrank(bob);
+        lending.borrow(address(usdc), 10 ether);
+        lending.borrow(address(usdc), 20 ether);
+        vm.stopPrank();
+        
+        IERC20 debtUSDCToken = IERC20(lending.getDebtToken(address(usdc)));
+
+        assertEq(debtUSDCToken.balanceOf(address(bob)), 10030 ether);
+        assertEq(usdc.balanceOf(address(bob)), 10030 ether);
+    }
+
     function testInterest() public {
         testBorrow();
         IERC20 debtUSDCToken = IERC20(lending.getDebtToken(address(usdc)));
