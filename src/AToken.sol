@@ -30,12 +30,6 @@ contract AToken is ERC20 {
     }
 
     function mint(address account, uint256 amount) public onlyOwner {
-        if (!_added[account]) {
-            _added[account] = true;
-            _userList.push(account);
-        }
-
-        _state[account] = true;
         _mint(account, amount);
     }
 
@@ -52,8 +46,6 @@ contract AToken is ERC20 {
 
     function burn(address account, uint256 amount) public onlyOwner {
         _burn(account, amount);
-        if (balanceOf(account) == 0)
-            _state[account] = false;
     }
 
     function setLiquidate(address account, bool state) public onlyOwner {
@@ -71,5 +63,36 @@ contract AToken is ERC20 {
     function guarantee(address account) public view returns (bool) {
         return _guarantee[account];
     }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal override virtual {
+        super._beforeTokenTransfer(from, to, amount);
+
+        if (to != address(0)) {
+            require(!(_guarantee[from] || _liquidate[from]), "AToken: Guanteed or Liquidated");
+            
+            if (!_added[to]) {
+                _added[to] = true;
+                _userList.push(to);
+            }
+
+            _state[to] = true;
+        }
+    }
+
+    function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal override virtual {
+        super._afterTokenTransfer(from, to, amount);
+        
+        if (balanceOf(from) == 0)
+            _state[from] = false;
+    }
+
 
 }

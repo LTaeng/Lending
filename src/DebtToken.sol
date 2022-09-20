@@ -90,7 +90,9 @@ contract DebtToken is ERC20 {
         uint256 amount
     ) internal override virtual {
         super._beforeTokenTransfer(from, to, amount);
+        require(from == address(0) || to == address(0), "Lending: Debt Token is not transfer");
         if (from != address(0))
             _updateBalance(from);
     }
+
 }
