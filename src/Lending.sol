@@ -83,9 +83,9 @@ contract Lending {
 
     // tokenAddress => 환전하고자 하는 A 토큰
     function withdraw(address tokenAddress, uint256 amount) external lock liquidated {
-        require(tokenAddress != address(0), "Lending: Not support this token");
+        require(tokens[tokenAddress] != address(0), "Lending: Not support this token");
 
-        AToken token = AToken(tokenAddress);
+        AToken token = AToken(tokens[tokenAddress]);
         require(token.balanceOf(msg.sender) >= amount, "Lending: Over than your balances");
         require(!token.guarantee(msg.sender), "Lending: Guarnatee is locked");
 
@@ -114,17 +114,19 @@ contract Lending {
         IERC20(tokenAddress).transfer(msg.sender, amount);
     }
 
-    // tokenAddress => 갚고자 하는 Debt 토큰
+    // tokenAddress => 갚고자 하는 토큰
     function repay(address tokenAddress, uint256 amount) external lock liquidated {
-        DebtToken token = DebtToken(tokenAddress);
-        IERC20 original = IERC20(token.original());
+        require(debtTokens[tokenAddress] != address(0), "Lending: Not support this token");
+
+        DebtToken token = DebtToken(debtTokens[tokenAddress]);
+        IERC20 original = IERC20(tokenAddress);
 
         require(original.balanceOf(msg.sender) >= amount, "Lending: Over than your balances");
 
         uint interest = token.getLastInterest(msg.sender);
         uint fee = (interest > amount) ? amount : interest;
 
-        AToken(tokens[address(original)]).updateInterest(fee);
+        AToken(tokens[tokenAddress]).updateInterest(fee);
         token.burn(msg.sender, amount);
 
         if (token.balanceOf(msg.sender) == 0)
@@ -132,13 +134,15 @@ contract Lending {
     }
 
 
-    // tokenAddress => 갚고자 하는 Debt 토큰
+    // tokenAddress => 갚고자 하는 토큰
     function liquidate(address user, address tokenAddress, uint256 amount) external lock {
-        DebtToken debtToken = DebtToken(tokenAddress);
-        IERC20 original = IERC20(debtToken.original());
+        require(debtTokens[tokenAddress] != address(0), "Lending: Not support this token");
+
+        DebtToken debtToken = DebtToken(debtTokens[tokenAddress]);
+        IERC20 original = IERC20(tokenAddress);
 
         AToken aETHToken = AToken(tokens[address(0)]);
-        AToken aToken = AToken(tokens[address(original)]);
+        AToken aToken = AToken(tokens[tokenAddress]);
 
         uint256 debt = debtToken.balanceOf(user);
         uint256 deposited = aToken.balanceOf(user);

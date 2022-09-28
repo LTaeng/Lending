@@ -70,7 +70,7 @@ contract LPTokenTest is Test {
         IERC20 aToken = IERC20(lending.getAToken(address(usdc)));
 
         vm.startPrank(alice);
-        lending.withdraw(address(aToken), 20 ether);
+        lending.withdraw(address(usdc), 20 ether);
         vm.stopPrank();
 
         assertEq(aToken.balanceOf(address(alice)), 10000000 ether - 20 ether);
@@ -83,7 +83,7 @@ contract LPTokenTest is Test {
         IERC20 aToken = IERC20(lending.getAToken(address(0)));
 
         vm.startPrank(bob);
-        lending.withdraw(address(aToken), 20 ether);
+        lending.withdraw(address(0), 20 ether);
         vm.stopPrank();
 
         assertEq(aToken.balanceOf(address(bob)), 80 ether);
@@ -164,25 +164,19 @@ contract LPTokenTest is Test {
 
     function testBorrowRepayWithdraw() public {
         testBorrow();
-        
-        IERC20 aETHToken = IERC20(lending.getAToken(address(0)));
-        IERC20 debtUSDCToken = IERC20(lending.getDebtToken(address(usdc)));
 
         vm.startPrank(bob);
-        lending.repay(address(debtUSDCToken), 10000 ether);
-        lending.withdraw(address(aETHToken), 100 ether);
+        lending.repay(address(usdc), 10000 ether);
+        lending.withdraw(address(0), 100 ether);
         vm.stopPrank();
     }
 
     function testFailBorrowRepayWithdraw() public {
         testBorrow();
-        
-        IERC20 aETHToken = IERC20(lending.getAToken(address(0)));
-        IERC20 debtUSDCToken = IERC20(lending.getDebtToken(address(usdc)));
 
         vm.startPrank(bob);
-        lending.repay(address(debtUSDCToken), 9900 ether);
-        lending.withdraw(address(aETHToken), 100 ether);
+        lending.repay(address(usdc), 9900 ether);
+        lending.withdraw(address(0), 100 ether);
         vm.stopPrank();
     }
 
@@ -210,7 +204,7 @@ contract LPTokenTest is Test {
 
         vm.startPrank(bob);
 
-        lending.repay(address(debtUSDCToken), 10 ether);
+        lending.repay(address(usdc), 10 ether);
         vm.stopPrank();
 
         assertEq(aUSDCToken.balanceOf(address(alice)), 10000010 ether);
@@ -220,7 +214,7 @@ contract LPTokenTest is Test {
 
         vm.startPrank(bob);
 
-        lending.repay(address(debtUSDCToken), 1010 ether);
+        lending.repay(address(usdc), 1010 ether);
         vm.stopPrank();
 
         assertEq(aUSDCToken.balanceOf(address(alice)), 10000020 ether);
@@ -239,14 +233,14 @@ contract LPTokenTest is Test {
         
         vm.startPrank(carol);
         usdc.approve(address(lending), 1200 ether);
-        lending.liquidate(bob, address(debtUSDCToken), 1200 ether);
+        lending.liquidate(bob, address(usdc), 1200 ether);
         vm.stopPrank();
         
         assertEq(aETHToken.liquidate(address(bob)), true);
 
         vm.startPrank(dave);
         usdc.approve(address(lending), 8800 ether);
-        lending.liquidate(bob, address(debtUSDCToken), 8800 ether);
+        lending.liquidate(bob, address(usdc), 8800 ether);
         vm.stopPrank();
 
         assertEq(address(carol).balance, 10 ether);
