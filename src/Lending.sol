@@ -17,7 +17,7 @@ contract Lending {
     mapping(address => address) public debtTokens;
 
     address[] public oracleList;
-    mapping(address => bool) public oracleState;
+    mapping(address => uint[]) public oraclePrices;
 
 
     uint private unlocked = 1;
@@ -45,12 +45,16 @@ contract Lending {
     function addOracle(address addr) public {
         require(msg.sender == owner);
         oracleList.push(addr);
-        oracleState[addr] = true;
     }
 
     function removeOracle(address addr) public {
         require(msg.sender == owner);
-        oracleState[addr] = false;
+        for (uint i = 0; i < oracleList.length; ++i) {
+            if (oracleList[i] == addr) {
+                oracleList[i] = oracleList[oracleList.length - 1];
+                oracleList.pop();
+            }
+        }
     }
 
     function getAToken(address token) public view returns (address) {
@@ -102,8 +106,9 @@ contract Lending {
         require(debtTokens[tokenAddress] != address(0), "Lending: Not support this token");
 
         uint256 deposited = IERC20(tokens[address(0)]).balanceOf(msg.sender);
-        uint256 price = getOraclePrice(address(0));
-        uint256 maxLtv = price * deposited / 2;
+        uint256 etherPrice = getOraclePrice(address(0));
+        uint256 tokenPrice = getOraclePrice(address(tokenAddress));
+        uint256 maxLtv = etherPrice / tokenPrice * deposited / 2;
 
         DebtToken token = DebtToken(debtTokens[tokenAddress]);
         require(maxLtv >= amount + token.balanceOf(msg.sender), "Lending: Over than your LTV");
@@ -142,12 +147,12 @@ contract Lending {
         IERC20 original = IERC20(tokenAddress);
 
         AToken aETHToken = AToken(tokens[address(0)]);
-        AToken aToken = AToken(tokens[tokenAddress]);
 
         uint256 debt = debtToken.balanceOf(user);
-        uint256 deposited = aToken.balanceOf(user);
-        uint256 price = getOraclePrice(address(0));
-        uint256 limit = deposited * price * 75 / 100;
+        uint256 deposited = aETHToken.balanceOf(user);
+        uint256 etherPrice = getOraclePrice(address(0));
+        uint256 tokenPrice = getOraclePrice(address(tokenAddress));
+        uint256 limit = deposited * (etherPrice / tokenPrice) * 75 / 100;
 
         if (!aETHToken.liquidate(user)) {
             require(limit <= debt, "Lending: Not over than limit");
@@ -157,7 +162,9 @@ contract Lending {
         require(original.balanceOf(msg.sender) >= amount, "Lending: Over than your balances");
         require(debt >= amount, "Lending: Over than Debt");
 
-        uint256 eth = amount / price;
+        uint256 eth = amount / etherPrice * tokenPrice;
+        eth += eth / 1000 * 5;
+
         aETHToken.burn(user, eth);
         debtToken.burn(user, amount);
 
@@ -169,19 +176,43 @@ contract Lending {
 
     }
 
-    function getOraclePrice(address token) public view returns (uint256 prices) {
-        uint256 num;
+    function getOraclePrice(address token) public returns (uint256) {
+        delete oraclePrices[token];
         for (uint i = 0; i < oracleList.length; ++i) {
             address oracle = oracleList[i];
-            if (!oracleState[oracle])
-                continue;
-            prices += DreamOracle(oracle).getPrice(token);
-            num++;
+            oraclePrices[token].push(DreamOracle(oracle).getPrice(token));
         }
 
-        prices /= num;
+        return median(oraclePrices[token], oraclePrices[token].length);
     }
 
+    function swap(uint256[] memory array, uint256 i, uint256 j) internal pure {
+        (array[i], array[j]) = (array[j], array[i]);
+    }
 
+    function average(uint256 a, uint256 b) internal pure returns (uint256) {
+        // (a + b) / 2 can overflow.
+        return (a & b) + (a ^ b) / 2;
+    }
+
+    function sort(uint256[] memory array, uint256 begin, uint256 end) internal pure {
+        if (begin < end) {
+            uint256 j = begin;
+            uint256 pivot = array[j];
+            for (uint256 i = begin + 1; i < end; ++i) {
+                if (array[i] < pivot) {
+                    swap(array, i, ++j);
+                }
+            }
+            swap(array, begin, j);
+            sort(array, begin, j);
+            sort(array, j + 1, end);
+        }
+    }
+
+    function median(uint256[] memory array, uint256 length) internal pure returns(uint256) {
+        sort(array, 0, length);
+        return length % 2 == 0 ? average(array[length/2-1], array[length/2]) : array[length/2];
+    }
 
 }

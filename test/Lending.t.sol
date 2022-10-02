@@ -12,7 +12,8 @@ contract LPTokenTest is Test {
     USDC public usdc;
 
     DreamOracle[] public oracleList;
-    uint256[] ethPrices = [200, 204];
+    uint256[] usdcPrice = [1 ether, 1 ether, 1 ether];
+    uint256[] ethPrices = [202 ether, 204 ether, 50 ether];
 
     address internal constant alice = address(1);
     address internal constant bob = address(2);
@@ -26,7 +27,7 @@ contract LPTokenTest is Test {
         for (uint i = 0; i < ethPrices.length; ++i) {
             DreamOracle oracle = new DreamOracle();
             oracle.setPrice(address(0), ethPrices[i]);
-            oracle.setPrice(address(usdc), 1);
+            oracle.setPrice(address(usdc), usdcPrice[i]);
             lending.addOracle(address(oracle));
             oracleList.push(oracle);
         }
@@ -228,8 +229,8 @@ contract LPTokenTest is Test {
         AToken aETHToken = AToken(lending.getAToken(address(0)));
         DebtToken debtUSDCToken = DebtToken(lending.getDebtToken(address(usdc)));
 
-        oracleList[0].setPrice(address(0), 100);
-        oracleList[1].setPrice(address(0), 140);
+        oracleList[0].setPrice(address(0), 120 ether);
+        oracleList[1].setPrice(address(0), 140 ether);
         
         vm.startPrank(carol);
         usdc.approve(address(lending), 1200 ether);
@@ -243,7 +244,7 @@ contract LPTokenTest is Test {
         lending.liquidate(bob, address(usdc), 8800 ether);
         vm.stopPrank();
 
-        assertEq(address(carol).balance, 10 ether);
+        assertEq(address(carol).balance, 10.05 ether);
         assertEq(debtUSDCToken.balanceOf(address(bob)), 0 ether);
         assertEq(aETHToken.liquidate(address(bob)), false);
 

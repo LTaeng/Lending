@@ -9,7 +9,6 @@ contract AToken is ERC20 {
     address private owner;
     address[] private _userList;
     mapping(address => bool) private _added;
-    mapping(address => bool) private _state;
     mapping(address => bool) private _liquidate;
     mapping(address => bool) private _guarantee;
 
@@ -36,9 +35,6 @@ contract AToken is ERC20 {
     function updateInterest(uint256 interest) public onlyOwner {
         for (uint256 i = 0; i < _userList.length; ++i) {
             address account = _userList[i];
-            if (!_state[account])
-                continue;
-
             uint256 amount = interest * balanceOf(account) / totalSupply();
             _mint(account, amount);
         }
@@ -73,14 +69,13 @@ contract AToken is ERC20 {
 
         if (to != address(0)) {
             require(!(_guarantee[from] || _liquidate[from]), "AToken: Guanteed or Liquidated");
-            
+
             if (!_added[to]) {
                 _added[to] = true;
                 _userList.push(to);
             }
-
-            _state[to] = true;
         }
+
     }
 
     function _afterTokenTransfer(
@@ -90,8 +85,15 @@ contract AToken is ERC20 {
     ) internal override virtual {
         super._afterTokenTransfer(from, to, amount);
         
-        if (balanceOf(from) == 0)
-            _state[from] = false;
+        if (balanceOf(from) == 0) {
+            _added[from] = false;
+            for (uint i = 0; i < _userList.length; ++i) {
+                if (_userList[i] == from) {
+                    _userList[i] = _userList[_userList.length - 1];
+                    _userList.pop();
+                }
+            }
+        }
     }
 
 
