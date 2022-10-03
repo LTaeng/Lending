@@ -16,6 +16,8 @@ contract Lending {
     mapping(address => address) public tokens;
     mapping(address => address) public debtTokens;
 
+    mapping(address => mapping(address => bool)) public liquidated;
+
     address[] public oracleList;
     mapping(address => uint[]) public oraclePrices;
 
@@ -65,13 +67,6 @@ contract Lending {
         return debtTokens[token];
     }
 
-    modifier liquidated() {
-        AToken aToken = AToken(tokens[address(0)]);
-        require(!aToken.liquidate(msg.sender), "Lending: ETH is locked");
-        _;
-    }
-
-
     // tokenAddress => 투입하고자 하는 토큰 주소, address(0)은 ETH
     function deposit(address tokenAddress, uint256 amount) external payable lock {
         require(tokens[tokenAddress] != address(0), "Lending: Not support this token");
@@ -86,12 +81,11 @@ contract Lending {
     }
 
     // tokenAddress => 환전하고자 하는 A 토큰
-    function withdraw(address tokenAddress, uint256 amount) external lock liquidated {
+    function withdraw(address tokenAddress, uint256 amount) external lock {
         require(tokens[tokenAddress] != address(0), "Lending: Not support this token");
 
         AToken token = AToken(tokens[tokenAddress]);
         require(token.balanceOf(msg.sender) >= amount, "Lending: Over than your balances");
-        require(!token.guarantee(msg.sender), "Lending: Guarnatee is locked");
 
         token.burn(msg.sender, amount);
         address original = token.original();
@@ -102,7 +96,7 @@ contract Lending {
     }
 
     // tokenAddress => 빌리고자 하는 토큰
-    function borrow(address tokenAddress, uint256 amount) external lock liquidated {
+    function borrow(address tokenAddress, uint256 amount) external lock {
         require(debtTokens[tokenAddress] != address(0), "Lending: Not support this token");
 
         uint256 deposited = IERC20(tokens[address(0)]).balanceOf(msg.sender);
@@ -114,13 +108,16 @@ contract Lending {
         require(maxLtv >= amount + token.balanceOf(msg.sender), "Lending: Over than your LTV");
         require(IERC20(token.original()).balanceOf(address(this)) >= amount, "Lending: Not enough tokens");
 
-        AToken(tokens[address(0)]).setGuarantee(msg.sender, true);
+
+        uint256 garantee = amount / (etherPrice / 1 ether) * 2;
+
+        AToken(tokens[address(0)]).addGuarantee(msg.sender, garantee);
         token.mint(msg.sender, amount);
         IERC20(tokenAddress).transfer(msg.sender, amount);
     }
 
     // tokenAddress => 갚고자 하는 토큰
-    function repay(address tokenAddress, uint256 amount) external lock liquidated {
+    function repay(address tokenAddress, uint256 amount) external lock {
         require(debtTokens[tokenAddress] != address(0), "Lending: Not support this token");
 
         DebtToken token = DebtToken(debtTokens[tokenAddress]);
@@ -136,7 +133,7 @@ contract Lending {
         token.burn(msg.sender, amount);
 
         if (token.balanceOf(msg.sender) == 0)
-            AToken(tokens[address(0)]).setGuarantee(msg.sender, false);
+            AToken(tokens[address(0)]).resetGuarantee(msg.sender);
     }
 
 
@@ -150,31 +147,31 @@ contract Lending {
         AToken aETHToken = AToken(tokens[address(0)]);
 
         uint256 debt = debtToken.balanceOf(user);
-        uint256 deposited = aETHToken.balanceOf(user);
         uint256 etherPrice = getOraclePrice(address(0));
         uint256 tokenPrice = getOraclePrice(address(tokenAddress));
-        uint256 limit = deposited * (etherPrice / tokenPrice) * 75 / 100;
 
-        if (!aETHToken.liquidate(user)) {
+        if (!liquidated[user][tokenAddress]) {
+            uint256 deposited = aETHToken.guarantee(user);
+            uint256 limit = deposited * (etherPrice / tokenPrice) * 75 / 100;
+
             require(limit <= debt, "Lending: Not over than limit");
-            aETHToken.setLiquidate(user, true);
+            liquidated[user][tokenAddress] = true;
+            aETHToken.resetGuarantee(user);
+            aETHToken.burn(user, deposited);
         }
 
         require(original.balanceOf(msg.sender) >= amount, "Lending: Over than your balances");
         require(debt >= amount, "Lending: Over than Debt");
 
-        uint256 eth = amount / etherPrice * tokenPrice;
+        uint256 eth = amount / (etherPrice / 1 ether);
         eth += eth / 1000 * 5;
 
-        aETHToken.burn(user, eth);
         debtToken.burn(user, amount);
-
         original.transferFrom(msg.sender, address(this), amount);
         payable(msg.sender).transfer(eth);
 
         if (debtToken.balanceOf(user) == 0)
-            aETHToken.setLiquidate(user, false);
-
+            liquidated[user][tokenAddress] = false;
     }
 
     function getOraclePrice(address token) public returns (uint256) {

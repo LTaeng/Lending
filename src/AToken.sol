@@ -9,8 +9,7 @@ import "../lib/forge-std/src/console2.sol";
 contract AToken is ERC20 {
 
     address private owner;
-    mapping(address => bool) private _liquidate;
-    mapping(address => bool) private _guarantee;
+    mapping(address => uint) private _guarantee;
 
     struct Tx {
         uint timestamp;
@@ -73,19 +72,15 @@ contract AToken is ERC20 {
         _burn(account, amount);
     }
 
-    function setLiquidate(address account, bool state) public onlyOwner {
-        _liquidate[account] = state;
+    function addGuarantee(address account, uint amount) public onlyOwner {
+        _guarantee[account] += amount;
     }
 
-    function liquidate(address account) public view returns (bool) {
-        return _liquidate[account];
+    function resetGuarantee(address account) public onlyOwner {
+        _guarantee[account] = 0;
     }
 
-    function setGuarantee(address account, bool state) public onlyOwner {
-        _guarantee[account] = state;
-    }
-
-    function guarantee(address account) public view returns (bool) {
+    function guarantee(address account) public view returns (uint) {
         return _guarantee[account];
     }
 
@@ -100,11 +95,12 @@ contract AToken is ERC20 {
     ) internal override virtual {
         super._beforeTokenTransfer(from, to, amount);
 
-        if (to != address(0))
-            require(!(_guarantee[from] || _liquidate[from]), "AToken: Guanteed or Liquidated");
-        
+        if (from != address(0))
+            require(balanceOf(from) - amount >= guarantee(from), "AToken: Over than guarantees");
+
         if (to != address(0) && from != address(0))
             _updateBalance(from);
+
     }
 
     function _afterTokenTransfer(

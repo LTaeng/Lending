@@ -155,11 +155,9 @@ contract LPTokenTest is Test {
 
     function testFailBorrowAndWithdraw() public {
         testBorrow();
-        
-        IERC20 aToken = IERC20(lending.getAToken(address(0)));
 
         vm.startPrank(bob);
-        lending.withdraw(address(aToken), 100 ether);
+        lending.withdraw(address(0), 100 ether);
         vm.stopPrank();
     }
 
@@ -240,8 +238,8 @@ contract LPTokenTest is Test {
         usdc.approve(address(lending), 1200 ether);
         lending.liquidate(bob, address(usdc), 1200 ether);
         vm.stopPrank();
-        
-        assertEq(aETHToken.liquidate(address(bob)), true);
+
+        assertEq(aETHToken.guarantee(address(bob)), 0);
 
         vm.startPrank(dave);
         usdc.approve(address(lending), 8800 ether);
@@ -250,7 +248,6 @@ contract LPTokenTest is Test {
 
         assertEq(address(carol).balance, 10.05 ether);
         assertEq(debtUSDCToken.balanceOf(address(bob)), 0 ether);
-        assertEq(aETHToken.liquidate(address(bob)), false);
 
     }
 
@@ -326,4 +323,52 @@ contract LPTokenTest is Test {
         //console2.log(aToken.balanceOf(address(alice)), aToken.appliedIdx(address(alice)));
     }
 
+    function testBorrowAndWithdraw() public {
+        testUSDCDeposit();
+        testETHDeposit();
+
+        oracleList[0].setPrice(address(0), 200 ether);
+        oracleList[1].setPrice(address(0), 240 ether);
+
+        vm.startPrank(bob);
+
+        lending.borrow(address(usdc), 1000 ether);
+        vm.stopPrank();
+        
+        AToken aETHToken = AToken(lending.getAToken(address(0)));
+        assertEq(aETHToken.guarantee(address(bob)), 10 ether);
+
+        vm.startPrank(bob);
+        lending.withdraw(address(0), 90 ether);
+        vm.stopPrank();
+
+        assertEq(aETHToken.balanceOf(address(bob)), 10 ether);
+    }
+
+    function testGuaranteeOut() public {
+        testUSDCDeposit();
+        testETHDeposit();
+
+        oracleList[0].setPrice(address(0), 200 ether);
+        oracleList[1].setPrice(address(0), 240 ether);
+
+        vm.startPrank(bob);
+
+        lending.borrow(address(usdc), 1000 ether);
+        vm.stopPrank();
+
+        AToken aETHToken = AToken(lending.getAToken(address(0)));
+        DebtToken debtUSDCToken = DebtToken(lending.getDebtToken(address(usdc)));
+
+        oracleList[0].setPrice(address(0), 100 ether);
+        oracleList[1].setPrice(address(0), 120 ether);
+        
+        vm.startPrank(carol);
+        lending.liquidate(bob, address(usdc), 0);
+        vm.stopPrank();
+
+        assertEq(aETHToken.guarantee(address(bob)), 0);
+        assertEq(aETHToken.balanceOf(address(bob)), 90 ether);
+
+    }
 }
