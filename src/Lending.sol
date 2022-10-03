@@ -127,11 +127,12 @@ contract Lending {
         IERC20 original = IERC20(tokenAddress);
 
         require(original.balanceOf(msg.sender) >= amount, "Lending: Over than your balances");
+        original.transferFrom(msg.sender, address(this), amount);
 
         uint interest = token.getLastInterest(msg.sender);
         uint fee = (interest > amount) ? amount : interest;
 
-        AToken(tokens[tokenAddress]).updateInterest(fee);
+        AToken(tokens[tokenAddress]).addInterestTx(block.timestamp, fee);
         token.burn(msg.sender, amount);
 
         if (token.balanceOf(msg.sender) == 0)

@@ -167,6 +167,7 @@ contract LPTokenTest is Test {
         testBorrow();
 
         vm.startPrank(bob);
+        usdc.approve(address(lending), 10000 ether);
         lending.repay(address(usdc), 10000 ether);
         lending.withdraw(address(0), 100 ether);
         vm.stopPrank();
@@ -176,6 +177,7 @@ contract LPTokenTest is Test {
         testBorrow();
 
         vm.startPrank(bob);
+        usdc.approve(address(lending), 9900 ether);
         lending.repay(address(usdc), 9900 ether);
         lending.withdraw(address(0), 100 ether);
         vm.stopPrank();
@@ -204,7 +206,8 @@ contract LPTokenTest is Test {
         assertEq(usdc.balanceOf(address(bob)), 10000 ether);
 
         vm.startPrank(bob);
-
+        
+        usdc.approve(address(lending), 10 ether);
         lending.repay(address(usdc), 10 ether);
         vm.stopPrank();
 
@@ -215,6 +218,7 @@ contract LPTokenTest is Test {
 
         vm.startPrank(bob);
 
+        usdc.approve(address(lending), 1010 ether);
         lending.repay(address(usdc), 1010 ether);
         vm.stopPrank();
 
@@ -248,6 +252,78 @@ contract LPTokenTest is Test {
         assertEq(debtUSDCToken.balanceOf(address(bob)), 0 ether);
         assertEq(aETHToken.liquidate(address(bob)), false);
 
+    }
+
+    function testMultiInterest() public {
+
+        vm.startPrank(alice);
+        usdc.approve(address(lending), 10000000 ether);
+        lending.deposit(address(usdc), 10000000 ether);
+        vm.stopPrank();
+
+        vm.startPrank(dave);
+        usdc.approve(address(lending), 10000000 ether);
+        lending.deposit(address(usdc), 10000000 ether);
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        lending.deposit{value: 100 ether}(address(0), 100 ether);
+        lending.borrow(address(usdc), 10000 ether);
+        vm.stopPrank();
+
+        AToken aToken = AToken(lending.getAToken(address(usdc)));
+        DebtToken debtUSDCToken = DebtToken(lending.getDebtToken(address(usdc)));
+
+        //console2.log(aToken.balanceOf(address(dave)), aToken.appliedIdx(address(dave)));
+        //console2.log(aToken.balanceOf(address(alice)), aToken.appliedIdx(address(alice)));
+
+        vm.warp(block.timestamp + 24 hours);
+        assertEq(debtUSDCToken.balanceOf(address(bob)), 10010 ether);
+        assertEq(usdc.balanceOf(address(bob)), 10000 ether);
+
+        usdc.mint(bob, 10 ether);
+        vm.startPrank(bob);
+        usdc.approve(address(lending), 10010 ether);
+        lending.repay(address(usdc), 10010 ether);
+        vm.stopPrank();
+
+
+        //console2.log(aToken.balanceOf(address(dave)), aToken.appliedIdx(address(dave)));
+        //console2.log(aToken.balanceOf(address(alice)), aToken.appliedIdx(address(alice)));
+
+        vm.warp(block.timestamp + 24 hours);
+
+        vm.startPrank(bob);
+        lending.borrow(address(usdc), 10000 ether);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 24 hours);
+
+        assertEq(debtUSDCToken.balanceOf(address(bob)), 10010 ether);
+        assertEq(usdc.balanceOf(address(bob)), 10000 ether);
+
+        usdc.mint(bob, 10 ether);
+        vm.startPrank(bob);
+        usdc.approve(address(lending), 10010 ether);
+        lending.repay(address(usdc), 10010 ether);
+        vm.stopPrank();
+
+        //console2.log(aToken.balanceOf(address(dave)), aToken.appliedIdx(address(dave)));
+        //console2.log(aToken.balanceOf(address(alice)), aToken.appliedIdx(address(alice)));
+
+        vm.startPrank(alice);
+        lending.withdraw(address(usdc), aToken.balanceOf(address(alice)));
+        vm.stopPrank();
+
+        //console2.log(aToken.balanceOf(address(dave)), aToken.appliedIdx(address(dave)));
+        //console2.log(aToken.balanceOf(address(alice)), aToken.appliedIdx(address(alice)));
+
+        vm.startPrank(dave);
+        aToken.transfer(alice, aToken.balanceOf(address(alice)));
+        vm.stopPrank();
+
+        //console2.log(aToken.balanceOf(address(dave)), aToken.appliedIdx(address(dave)));
+        //console2.log(aToken.balanceOf(address(alice)), aToken.appliedIdx(address(alice)));
     }
 
 }
