@@ -80,6 +80,18 @@ contract Lending {
         AToken(tokens[tokenAddress]).mint(msg.sender, amount);
     }
 
+    function addGurantee(address tokenAddress, uint256 amount) external lock {
+        require(tokens[tokenAddress] != address(0), "Lending: Not support this token");
+        
+        AToken token = AToken(tokens[tokenAddress]);
+        uint256 gurantee = token.guarantee(msg.sender);
+
+        require(gurantee != 0, "Lending: Not borrowed");
+        require(token.balanceOf(msg.sender) >= amount + gurantee, "Lending: Over than your balances");
+
+        token.addGuarantee(msg.sender, amount);
+    }
+
     // tokenAddress => 환전하고자 하는 A 토큰
     function withdraw(address tokenAddress, uint256 amount) external lock {
         require(tokens[tokenAddress] != address(0), "Lending: Not support this token");

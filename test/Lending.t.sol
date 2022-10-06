@@ -358,7 +358,6 @@ contract LPTokenTest is Test {
         vm.stopPrank();
 
         AToken aETHToken = AToken(lending.getAToken(address(0)));
-        DebtToken debtUSDCToken = DebtToken(lending.getDebtToken(address(usdc)));
 
         oracleList[0].setPrice(address(0), 100 ether);
         oracleList[1].setPrice(address(0), 120 ether);
@@ -369,6 +368,31 @@ contract LPTokenTest is Test {
 
         assertEq(aETHToken.guarantee(address(bob)), 0);
         assertEq(aETHToken.balanceOf(address(bob)), 90 ether);
+
+    }
+
+    function testAddGuarantee() public {
+        testUSDCDeposit();
+        testETHDeposit();
+
+        oracleList[0].setPrice(address(0), 200 ether);
+        oracleList[1].setPrice(address(0), 240 ether);
+
+        vm.startPrank(bob);
+        lending.borrow(address(usdc), 1000 ether);
+        vm.stopPrank();
+
+        oracleList[0].setPrice(address(0), 100 ether);
+        oracleList[1].setPrice(address(0), 120 ether);
+        
+        vm.startPrank(bob);
+        lending.addGurantee(address(0), 10 ether);
+        vm.stopPrank();
+        
+        vm.startPrank(carol);
+        vm.expectRevert("Lending: Not over than limit");
+        lending.liquidate(bob, address(usdc), 0);
+        vm.stopPrank();
 
     }
 }
