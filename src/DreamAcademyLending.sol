@@ -3,6 +3,10 @@ pragma solidity ^0.8.13;
 
 import "openzeppelin-contracts/token/ERC20/IERC20.sol";
 import "openzeppelin-contracts/token/ERC20/ERC20.sol";
+import "./ABDKMath64x64.sol";
+
+import "forge-std/Test.sol";
+
 
 interface IPriceOracle {
     function getPrice(address token) external view returns (uint256);
@@ -27,7 +31,7 @@ struct InterestBlock {
 }
 
 
-contract DreamAcademyLending {
+contract DreamAcademyLending is Test {
 
     address private owner;
     mapping(address => bool) public tokens;
@@ -49,6 +53,8 @@ contract DreamAcademyLending {
 
     mapping(address => mapping(address => uint256)) public liquidateAmount;
 
+    int128 borrowRate;
+
     constructor(IPriceOracle _oracle, address usdc) {
         owner = msg.sender;
         oracle = _oracle;
@@ -58,6 +64,8 @@ contract DreamAcademyLending {
 
         debtTokens[usdc] = true;
         borrowableToken.push(usdc);
+
+        borrowRate = ABDKMath64x64.divu(100000013882, 1e11);
     }
 
     function initializeLendingProtocol(address usdc) external payable {
@@ -148,6 +156,7 @@ contract DreamAcademyLending {
 
         if (balance - amount == 0) {
             _borrow[tokenAddress][msg.sender].principal = 0;
+            liquidateAmount[msg.sender][tokenAddress] = 0;
         }
     }
 
@@ -210,10 +219,8 @@ contract DreamAcademyLending {
         for (uint i = 0; i < borrowableToken.length; ++i) {
             address token = borrowableToken[i];
 
-            uint borrows = totalBorrows[token];
-            for (uint t = 0; t < block.number - updateBlock[token]; ++t)
-                borrows += borrows / 100000000000 * 13882;
-
+            int128 pow = ABDKMath64x64.pow(borrowRate, block.number - updateBlock[token]);
+            uint borrows = ABDKMath64x64.mulu(pow, totalBorrows[token]);
             uint interest = borrows - totalBorrows[token];
 
             interestBlock.push(InterestBlock(interest, totalReserves[token]));
@@ -250,9 +257,8 @@ contract DreamAcademyLending {
         if (b.principal == 0)
             return 0;
 
-        uint balance = b.balance;
-        for (uint i = 0; i < block.number - b.updateBlockNum; ++i)
-            balance += balance / 100000000000 * 13882;
+        int128 pow = ABDKMath64x64.pow(borrowRate, block.number - b.updateBlockNum);
+        uint balance = ABDKMath64x64.mulu(pow, b.balance);
 
         _borrow[tokenAddress][account].balance = balance;
         _borrow[tokenAddress][account].updateBlockNum = block.number;
